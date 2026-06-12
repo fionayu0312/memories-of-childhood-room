@@ -1,0 +1,155 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Room</title>
+  <style>
+    body { margin: 0; }
+
+    #room {
+      height: 100vh;
+      position: relative;
+      background-image: url("images/livingroom.png"); /* 改这里：换成对应图片名 */
+      background-size: cover;
+      background-position: center;
+      overflow: hidden;
+    }
+
+    /* 点击区域 */
+    .hotspot {
+      position: absolute;
+      cursor: pointer;
+    }
+
+    #popup {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 32px;
+      border-radius: 12px;
+      text-align: center;
+      z-index: 100;
+      width: 300px;
+    }
+    #popup p { font-size: 16px; color: #333; margin-bottom: 16px; }
+    .popup-btn {
+      font-size: 14px;
+      padding: 10px 20px;
+      margin: 6px;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+    }
+    #popup-record { background: #534AB7; color: white; }
+    #popup-play   { background: #3B6D11; color: white; display: none; }
+    #popup-skip   { background: transparent; border: 1px solid #ccc; color: #888; }
+    #recording-indicator { display: none; color: #e24b4a; font-size: 13px; margin: 8px 0; }
+
+    #back-btn {
+      position: absolute;
+      top: 16px; left: 16px;
+      z-index: 10;
+      padding: 8px 16px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      background: rgba(255,255,255,0.8);
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div id="room">
+   <button id="back-btn" onclick="window.location.href='index.html#select'">← Back</button>
+   
+    <!-- 点击区域，回来再加 -->
+    <!-- <div id="item1" class="hotspot"></div> -->
+
+    <div id="popup">
+      <p id="popup-text">memory</p>
+      <div id="recording-indicator">● recording...</div>
+      <button class="popup-btn" id="popup-play">▶ last memory</button>
+      <button class="popup-btn" id="popup-record">🎙 Share my memory</button>
+      <button class="popup-btn" id="popup-skip">Skip</button>
+    </div>
+  </div>
+
+<script>
+  const popup = document.getElementById('popup')
+  const popupText = document.getElementById('popup-text')
+
+  // 改这里：换成这个房间的物件
+  const memories = {
+    item1: { text: 'memory text here.', audio: null },
+    item2: { text: 'memory text here.', audio: null },
+  }
+
+  let currentItem = null
+  let mediaRecorder = null
+  let audioChunks = []
+
+  function openPopup(item) {
+    currentItem = item
+    const m = memories[item]
+    popupText.innerText = m.text
+    document.getElementById('recording-indicator').style.display = 'none'
+    document.getElementById('popup-record').style.display = 'inline'
+    document.getElementById('popup-record').innerText = '🎙 Share my memory'
+    document.getElementById('popup-skip').innerText = 'Skip'
+    document.getElementById('popup-play').style.display = m.audio ? 'inline' : 'none'
+    popup.style.display = 'block'
+  }
+
+  document.getElementById('popup-play').onclick = function(e) {
+    e.stopPropagation()
+    if (memories[currentItem].audio) {
+      const reader = new FileReader()
+      reader.onload = function(e) { new Audio(e.target.result).play() }
+      reader.readAsDataURL(memories[currentItem].audio)
+    }
+  }
+
+  document.getElementById('popup-record').onclick = async function(e) {
+    e.stopPropagation()
+    const btn = document.getElementById('popup-record')
+    const indicator = document.getElementById('recording-indicator')
+
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      mediaRecorder = new MediaRecorder(stream, { mimeType })
+      audioChunks = []
+
+      mediaRecorder.ondataavailable = function(e) {
+        if (e.data.size > 0) audioChunks.push(e.data)
+      }
+      mediaRecorder.onstop = function() {
+        memories[currentItem].audio = new Blob(audioChunks, { type: mimeType })
+        document.getElementById('popup-play').style.display = 'inline'
+        document.getElementById('popup-skip').innerText = 'Done'
+        indicator.style.display = 'none'
+        btn.innerText = '🎙 New recording'
+      }
+
+      mediaRecorder.start(100)
+      indicator.style.display = 'block'
+      btn.innerText = '⏹ Finish'
+
+    } else if (mediaRecorder.state === 'recording') {
+      mediaRecorder.stop()
+    }
+  }
+
+  document.getElementById('popup-skip').onclick = function(e) {
+    e.stopPropagation()
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop()
+    popup.style.display = 'none'
+  }
+
+  // 改这里：换成这个房间的物件
+  // document.getElementById('item1').onclick = function(e) { e.stopPropagation(); openPopup('item1') }
+  // document.getElementById('item2').onclick = function(e) { e.stopPropagation(); openPopup('item2') }
+</script>
+
+</body>
+</html>

@@ -1,0 +1,176 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Living Room</title>
+  <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; }
+    #room {
+      height: 100vh;
+      position: relative;
+      background-image: url("images/livingroom.png");
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      background-color: black;
+      overflow: hidden;
+    }
+    .hotspot { position: absolute; cursor: pointer; }
+    #balloon { width: 5%;  height: 15%; left: 33%; top: 2%; }
+    #tv      { width: 12%; height: 30%; left: 24%; top: 50%; transform: rotate(-8deg); transform-origin: bottom left; }
+    #sofa    { width: 28%; height: 30%; left: 40%; top: 43%; }
+    #shelf   { width: 8%;  height: 30%; right: 17%; top: 42%;}
+    #floor   { width: 50%; height: 26%; left: 30%; bottom: 1%; transform: rotate(-3deg); transform-origin: bottom right; }
+    #popup {
+  display: none;
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1008;
+  border: 0.5px solid #5a4020;
+  padding: 32px;
+  border-radius: 0;
+  text-align: center;
+  z-index: 100;
+  width: 320px;
+  font-family: 'IM Fell English', serif;
+}
+#popup p { 
+  font-size: 16px; 
+  color: #a89070; 
+  margin-bottom: 16px; 
+  font-style: italic;
+  line-height: 1.6;
+}
+.popup-btn { 
+  font-family: 'IM Fell English', serif;
+  font-size: 14px; 
+  padding: 10px 20px; 
+  margin: 6px; 
+  border-radius: 0; 
+  border: 0.5px solid #5a4020; 
+  cursor: pointer; 
+  background: transparent;
+  color: #c8b090;
+  letter-spacing: 0.5px;
+}
+.popup-btn:hover { border-color: #c8b090; color: #f0e6d3; }
+#popup-record { border-color: #c8b090; color: #f0e6d3; }
+#popup-play   { border-color: #3B6D11; color: #3B6D11; display: none; }
+#popup-skip   { color: #5a4020; border-color: #2a1a08; }
+#recording-indicator { display: none; color: #e24b4a; font-size: 13px; margin: 8px 0; font-family: sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="room">
+    <button id="back-btn" onclick="window.location.href='index.html#select'">← Back</button>
+    <div id="balloon" class="hotspot"></div>
+    <div id="tv"      class="hotspot"></div>
+    <div id="sofa"    class="hotspot"></div>
+    <div id="shelf"   class="hotspot"></div>
+    <div id="floor"   class="hotspot"></div>
+    <div id="popup">
+      <p id="popup-text">memory</p>
+      <div id="recording-indicator">● recording...</div>
+      <button class="popup-btn" id="popup-play">▶ last memory</button>
+      <button class="popup-btn" id="popup-record">🎙 Share my memory</button>
+      <button class="popup-btn" id="popup-skip">Skip</button>
+    </div>
+  </div>
+
+<script>
+  const popup = document.getElementById('popup')
+  const popupText = document.getElementById('popup-text')
+
+  const memories = {
+    balloon: { text: 'The balloons I brought home from the park when I was a child would stay on the ceiling and I couldnt get them down. They remained there until they ran out of air.', audio: null },
+    tv:      { text: 'Friday nights only.Spending times with family members', audio: null },
+    sofa:    { text: 'The leather sofa has become loose over time.', audio: null },
+    shelf:   { text: 'Originally, this place was for placing landline phones. However, with the advancement of technology, nowadays there are no landline phones in households.', audio: null },
+    floor:   { text: 'When I was young, my mom always told me to be careful not to drop anything on the floor and break the wooden floor.', audio: null },
+  }
+
+  // localStorage
+  const ROOM_ID = 'living'
+  Object.keys(memories).forEach(function(item) {
+    const saved = localStorage.getItem(ROOM_ID + '_' + item)
+    if (saved) {
+      fetch(saved).then(r => r.blob()).then(blob => {
+        memories[item].audio = blob
+      })
+    }
+  })
+
+  let currentItem = null
+  let mediaRecorder = null
+  let audioChunks = []
+
+  function openPopup(item) {
+    currentItem = item
+    const m = memories[item]
+    popupText.innerText = m.text
+    document.getElementById('recording-indicator').style.display = 'none'
+    document.getElementById('popup-record').style.display = 'inline'
+    document.getElementById('popup-record').innerText = '🎙 Share my memory'
+    document.getElementById('popup-skip').innerText = 'Skip'
+    document.getElementById('popup-play').style.display = m.audio ? 'inline' : 'none'
+    popup.style.display = 'block'
+  }
+
+  document.getElementById('popup-play').onclick = function(e) {
+    e.stopPropagation()
+    if (memories[currentItem].audio) {
+      const reader = new FileReader()
+      reader.onload = function(e) { new Audio(e.target.result).play() }
+      reader.readAsDataURL(memories[currentItem].audio)
+    }
+  }
+
+  document.getElementById('popup-record').onclick = async function(e) {
+    e.stopPropagation()
+    const btn = document.getElementById('popup-record')
+    const indicator = document.getElementById('recording-indicator')
+    if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/mp4'
+      mediaRecorder = new MediaRecorder(stream, { mimeType })
+      audioChunks = []
+      mediaRecorder.ondataavailable = function(e) {
+        if (e.data.size > 0) audioChunks.push(e.data)
+      }
+      mediaRecorder.onstop = function() {
+        const blob = new Blob(audioChunks, { type: mimeType })
+        memories[currentItem].audio = blob
+        // 保存到localStorage
+        const reader = new FileReader()
+        reader.onload = function(e) {
+          localStorage.setItem(ROOM_ID + '_' + currentItem, e.target.result)
+        }
+        reader.readAsDataURL(blob)
+        document.getElementById('popup-play').style.display = 'inline'
+        document.getElementById('popup-skip').innerText = 'Done'
+        indicator.style.display = 'none'
+        btn.innerText = '🎙 New recording'
+      }
+      mediaRecorder.start(100)
+      indicator.style.display = 'block'
+      btn.innerText = '⏹ Finish'
+    } else if (mediaRecorder.state === 'recording') {
+      mediaRecorder.stop()
+    }
+  }
+
+  document.getElementById('popup-skip').onclick = function(e) {
+    e.stopPropagation()
+    if (mediaRecorder && mediaRecorder.state === 'recording') mediaRecorder.stop()
+    popup.style.display = 'none'
+  }
+
+  document.getElementById('balloon').onclick = function(e) { e.stopPropagation(); openPopup('balloon') }
+  document.getElementById('tv').onclick      = function(e) { e.stopPropagation(); openPopup('tv') }
+  document.getElementById('sofa').onclick    = function(e) { e.stopPropagation(); openPopup('sofa') }
+  document.getElementById('shelf').onclick   = function(e) { e.stopPropagation(); openPopup('shelf') }
+  document.getElementById('floor').onclick   = function(e) { e.stopPropagation(); openPopup('floor') }
+</script>
+</body>
+</html>
